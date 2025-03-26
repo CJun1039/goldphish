@@ -22,6 +22,10 @@ def add_args(subparser: argparse._SubParsersAction) -> typing.Tuple[str, typing.
     parser_name = 'generate-sample'
     parser: argparse.ArgumentParser = subparser.add_parser(parser_name)
 
+    # Add min_block and max_block as command-line arguments
+    parser.add_argument('--min-block', type=int, required=True, help='Minimum block number (start range)')
+    parser.add_argument('--max-block', type=int, required=True, help='Maximum block number (end range)')
+
     return parser_name, generate_sample
 
 
@@ -45,8 +49,8 @@ def generate_sample(w3: web3.Web3, args: argparse.Namespace):
         l.info(f'not filling sample labels')
         return
 
-    MIN_BLOCK =  9_569_113
-    MAX_BLOCK = 15_965_926
+    MIN_BLOCK = args.min_block
+    MAX_BLOCK = args.max_block
 
     l.info('assigning sample labels')
     # assign sample groups

@@ -311,7 +311,7 @@ def process_reservation(
     l.info(f'processing blocks {reservation_start:,} to {reservation_end_exclusive:,} ({reservation_end_exclusive-reservation_start:,} blocks)')
 
     throttler = BlockThrottle(
-        setpoint = 5_000, # log events per round-trip query
+        setpoint = 2500, # log events per round-trip query
         additive_increase = 2,
         initial = 10, # starting guess
     )
@@ -325,15 +325,20 @@ def process_reservation(
         this_end_block_inclusive = min(reservation_end_exclusive - 1, this_block_start + n_blocks - 1)
         assert this_block_start <= this_end_block_inclusive
 
-        f: web3._utils.filters.Filter = w3.eth.filter({
-            'fromBlock': this_block_start,
-            'toBlock': this_end_block_inclusive,
-            'topics': [ERC20_TRANSFER_TOPIC_HEX],
-        })
-        logs = f.get_all_entries()
-        throttler.observe(len(logs))
+        try: 
+            f: web3._utils.filters.Filter = w3.eth.filter({
+                'fromBlock': this_block_start,
+                'toBlock': this_end_block_inclusive,
+                'topics': [ERC20_TRANSFER_TOPIC_HEX],
+            })
+            logs = f.get_all_entries()
+            throttler.observe(len(logs))
 
-        process_batch(w3, curr, logs)
+            process_batch(w3, curr, logs)
+        except Exception as e:
+            l.exception(f"Error processing blocks {this_block_start} to {this_end_block_inclusive}: {e}")
+            raise ReservationCancelRequestedException(this_block_start)
+        
         curr.connection.commit()
 
         this_block_start = this_end_block_inclusive + 1

@@ -134,7 +134,10 @@ def main():
                 elapsed = time.time() - t_start
                 nps = i_res / elapsed
                 remain = len(assignments) - i_res
-                eta_s = remain / nps
+                if (nps == 0):
+                    eta_s = remain
+                else:
+                    eta_s = remain / nps
                 eta = datetime.timedelta(seconds=eta_s)
                 pct_done_assignment = (block_number - start_block) / (end_block - start_block + 1)
                 pct_done = (i_res + pct_done_assignment) / len(assignments)

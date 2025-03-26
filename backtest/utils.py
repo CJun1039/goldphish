@@ -59,7 +59,7 @@ def connect_rabbit() -> pika.BlockingConnection:
     return cxn
 
 def connect_db() -> psycopg2.extensions.connection:
-    pg_host = os.getenv('PSQL_HOST', 'ethereum-measurement-pg')
+    pg_host = os.getenv('PSQL_HOST', '')
     pg_port = int(os.getenv('PSQL_PORT', '5432'))
     pg_user = os.getenv('PSQL_USER', 'measure')
     pg_pass = os.getenv('PSQL_PASS', 'password')
@@ -194,15 +194,16 @@ class CancellationToken:
         self.curr = conn.cursor()
 
         self.curr.execute(
+            # Commented out this part as the table already exists in the database. 
+            # Leaving this here causes a problem with postgres sequence id.
+            # CREATE TABLE IF NOT EXISTS job_control (
+            #     id                  SERIAL NOT NULL PRIMARY KEY,
+            #     job_name            TEXT NOT NULL,
+            #     worker_name         TEXT NOT NULL,
+            #     is_cancel_requested BOOLEAN NOT NULL DEFAULT FALSE,
+            #     last_heartbeat      TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()::timestamp
+            # );
             '''
-            CREATE TABLE IF NOT EXISTS job_control (
-                id                  SERIAL NOT NULL PRIMARY KEY,
-                job_name            TEXT NOT NULL,
-                worker_name         TEXT NOT NULL,
-                is_cancel_requested BOOLEAN NOT NULL DEFAULT FALSE,
-                last_heartbeat      TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()::timestamp
-            );
-
             INSERT INTO job_control (job_name, worker_name) VALUES (%s, %s) RETURNING id;
             ''',
             (self.jobname, self.workername)
