@@ -51,17 +51,27 @@ def main():
             l.info('Setup db')
             return
 
-        web3_host = os.getenv('WEB3_HOST', 'ws://172.17.0.1:8546')
+        web3_http_host = os.getenv('WEB3_HOST', 'ws://172.17.0.1:8545')
+        web3_ws_host = os.getenv('WEB3_WS_HOST', 'ws://172.17.0.1:8546')
 
-        w3 = web3.Web3(web3.WebsocketProvider(
-            web3_host,
+        w3_ws = web3.Web3(web3.WebsocketProvider(
+            web3_ws_host,
             websocket_timeout=60 * 5,
             websocket_kwargs={
                 'max_size': 1024 * 1024 * 1024, # 1 Gb max payload
             },
         ))
 
-        if not w3.isConnected():
+        w3 = web3.Web3(web3.HTTPProvider(web3_http_host))        
+        
+        # Now that we are using HTTPProvider, there are a lot of noisy debug messages.
+        set_http_debug = os.getenv('SET_HTTP_DEBUG', 'false').lower() in ['1', 'true', 'yes', 'on']
+        if set_http_debug:
+            logging.getLogger("urllib3").setLevel(logging.WARNING)
+            logging.getLogger("requests").setLevel(logging.WARNING)
+            logging.getLogger("web3").setLevel(logging.WARNING)
+
+        if not w3.isConnected() or not w3_ws.isConnected():
             l.error(f'Could not connect to web3')
             exit(1)
 
@@ -97,7 +107,7 @@ def main():
 
             try:
                 with maybe_rez as (reservation_start, reservation_end):
-                    process_reservation(w3, curr, reservation_start, reservation_end, cancellation_token)
+                    process_reservation(w3, w3_ws, curr, reservation_start, reservation_end, cancellation_token)
             except ReservationCancelRequestedException:
                 pass
     except Exception:
@@ -303,6 +313,7 @@ class ReservationCancelRequestedException(Exception):
 
 def process_reservation(
         w3: web3.Web3,
+        w3_ws: web3.Web3,
         curr: psycopg2.extensions.cursor,
         reservation_start: int,
         reservation_end_exclusive: int,
@@ -326,7 +337,7 @@ def process_reservation(
         assert this_block_start <= this_end_block_inclusive
 
         try: 
-            f: web3._utils.filters.Filter = w3.eth.filter({
+            f: web3._utils.filters.Filter = w3_ws.eth.filter({
                 'fromBlock': this_block_start,
                 'toBlock': this_end_block_inclusive,
                 'topics': [ERC20_TRANSFER_TOPIC_HEX],

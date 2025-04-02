@@ -42,7 +42,7 @@ def setup_db(curr: psycopg2.extensions.cursor):
 
         CREATE TABLE IF NOT EXISTS sample_arbitrages (
             id            SERIAL PRIMARY KEY NOT NULL,
-            txn_hash      BYTEA NOT NULL,
+            txn_hash      BYTEA UNIQUE NOT NULL,
             block_number  INTEGER NOT NULL,
             n_cycles      INTEGER NOT NULL,
             gas_used      NUMERIC(78, 0) NOT NULL,
@@ -237,6 +237,7 @@ def _insert_arb(w3: web3.Web3, curr: psycopg2.extensions.cursor, arb: Arbitrage,
         INSERT INTO sample_arbitrages (
             txn_hash, block_number, n_cycles, gas_used, gas_price, shooter
         ) VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (txn_hash) DO NOTHING
         RETURNING id
         ''',
         (
@@ -248,8 +249,12 @@ def _insert_arb(w3: web3.Web3, curr: psycopg2.extensions.cursor, arb: Arbitrage,
             bytes.fromhex(arb.shooter[2:]) if arb.shooter is not None else None,
         ),
     )
+    result = curr.fetchone()
+    if result is None:
+        l.debug('failed to insert arbitrage - conflicting txn_hash')
+        return None
     assert curr.rowcount == 1
-    (arbitrage_id,) = curr.fetchone()
+    (arbitrage_id,) = result
 
     if arb.only_cycle is not None:
         assert arb.only_cycle.profit_token is not None
