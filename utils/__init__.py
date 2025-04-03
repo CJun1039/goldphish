@@ -99,79 +99,8 @@ def setup_logging(job_name = None, suppress: typing.List[str] = [], worker_name:
                   'web3.RequestManager', 'websockets.server', 'asyncio', 'pika'] + suppress:
         logging.getLogger(lname).setLevel(logging.WARNING)
 
-
-# class RetryingProvider(JSONBaseProvider):
-#     _internal_provider: web3.WebsocketProvider
-
-#     def __init__(self) -> None:
-#         super().__init__()
-#         self._internal_provider = None
-#         self._connect()
-
-#     def _connect(self):
-#         l.debug('connecting to web3')
-#         web3_host = os.getenv('WEB3_HOST', 'ws://172.17.0.1:8546')
-
-#         self._internal_provider = web3.WebsocketProvider(
-#             web3_host,
-#             websocket_timeout=60 * 5,
-#             websocket_kwargs={
-#                 'max_size': 1024 * 1024 * 1024, # 1 Gb max payload
-#             },
-#         )
-
-#     @backoff.on_exception(
-#         backoff.expo,
-#         (
-#             websockets.exceptions.ConnectionClosedError,
-#             asyncio.exceptions.TimeoutError,
-#         ),
-#         max_time = 10 * 60,
-#         factor = 4,
-#         on_backoff = lambda x: x['args'][0]._connect()
-#     )
-#     def make_request_batch(self, requests: typing.Tuple[str, typing.Any]) -> typing.List[web3.types.RPCResponse]:
-#         obj = []
-#         for method, params in requests:
-#             rpc_dict = {
-#                 "jsonrpc": "2.0",
-#                 "method": method,
-#                 "params": params or [],
-#                 "id": next(self.request_counter),
-#             }
-#             obj.append(rpc_dict)
-#         payload = json.dumps(obj).encode('ascii')
-
-#         future = asyncio.run_coroutine_threadsafe(
-#             self._internal_provider.coro_make_request(payload),
-#             web3.WebsocketProvider._loop
-#         )
-#         ret = future.result()
-#         ret = sorted(ret, key=lambda x: x['id'])
-#         return ret
-
-
-#     @backoff.on_exception(
-#         backoff.expo,
-#         (
-#             websockets.exceptions.ConnectionClosedError,
-#             asyncio.exceptions.TimeoutError,
-#         ),
-#         max_time = 10 * 60,
-#         factor = 4,
-#         on_backoff = lambda x: x['args'][0]._connect()
-#     )
-#     def make_request(self, method, params):
-#         request_data = self.encode_rpc_request(method, params)
-#         future = asyncio.run_coroutine_threadsafe(
-#             self._internal_provider.coro_make_request(request_data),
-#             web3.WebsocketProvider._loop
-#         )
-#         ret = future.result()
-#         return ret
-
 class RetryingProvider(JSONBaseProvider):
-    _internal_provider: web3.HTTPProvider
+    _internal_provider: web3.WebsocketProvider
 
     def __init__(self) -> None:
         super().__init__()
@@ -180,18 +109,25 @@ class RetryingProvider(JSONBaseProvider):
 
     def _connect(self):
         l.debug('connecting to web3')
-        web3_host = os.getenv('WEB3_HOST', 'https://erigon.xtra.science/')
-        self._internal_provider = web3.HTTPProvider(web3_host, request_kwargs={'timeout': 300})
+        web3_host = os.getenv('WEB3_HOST', 'ws://172.0.0.1:8646')
+
+        self._internal_provider = web3.WebsocketProvider(
+            web3_host,
+            websocket_timeout=60 * 5,
+            websocket_kwargs={
+                'max_size': 1024 * 1024 * 1024, # 1 Gb max payload
+            },
+        )
 
     @backoff.on_exception(
         backoff.expo,
         (
-            requests.exceptions.ConnectionError,
-            requests.exceptions.Timeout,
+            websockets.exceptions.ConnectionClosedError,
+            asyncio.exceptions.TimeoutError,
         ),
-        max_time=10 * 60,
-        factor=4,
-        on_backoff=lambda x: x['args'][0]._connect()
+        max_time = 10 * 60,
+        factor = 4,
+        on_backoff = lambda x: x['args'][0]._connect()
     )
     def make_request_batch(self, requests: typing.Tuple[str, typing.Any]) -> typing.List[web3.types.RPCResponse]:
         obj = []
@@ -203,23 +139,87 @@ class RetryingProvider(JSONBaseProvider):
                 "id": next(self.request_counter),
             }
             obj.append(rpc_dict)
+        payload = json.dumps(obj).encode('ascii')
 
-        response = self._internal_provider.make_batch_request(obj)
-        response = sorted(response, key=lambda x: x['id'])
-        return response
+        future = asyncio.run_coroutine_threadsafe(
+            self._internal_provider.coro_make_request(payload),
+            web3.WebsocketProvider._loop
+        )
+        ret = future.result()
+        ret = sorted(ret, key=lambda x: x['id'])
+        return ret
+
 
     @backoff.on_exception(
         backoff.expo,
         (
-            requests.exceptions.ConnectionError,
-            requests.exceptions.Timeout,
+            websockets.exceptions.ConnectionClosedError,
+            asyncio.exceptions.TimeoutError,
         ),
-        max_time=10 * 60,
-        factor=4,
-        on_backoff=lambda x: x['args'][0]._connect()
+        max_time = 10 * 60,
+        factor = 4,
+        on_backoff = lambda x: x['args'][0]._connect()
     )
     def make_request(self, method, params):
-        return self._internal_provider.make_request(method, params)
+        request_data = self.encode_rpc_request(method, params)
+        future = asyncio.run_coroutine_threadsafe(
+            self._internal_provider.coro_make_request(request_data),
+            web3.WebsocketProvider._loop
+        )
+        ret = future.result()
+        return ret
+
+
+# class RetryingProvider(JSONBaseProvider):
+#     _internal_provider: web3.HTTPProvider
+
+#     def __init__(self) -> None:
+#         super().__init__()
+#         self._internal_provider = None
+#         self._connect()
+
+#     def _connect(self):
+#         l.debug('connecting to web3')
+#         web3_host = os.getenv('WEB3_HOST', 'https://erigon.xtra.science/')
+#         self._internal_provider = web3.HTTPProvider(web3_host, request_kwargs={'timeout': 300})
+
+#     @backoff.on_exception(
+#         backoff.expo,
+#         (
+#             requests.exceptions.ConnectionError,
+#             requests.exceptions.Timeout,
+#         ),
+#         max_time=10 * 60,
+#         factor=4,
+#         on_backoff=lambda x: x['args'][0]._connect()
+#     )
+#     def make_request_batch(self, requests: typing.Tuple[str, typing.Any]) -> typing.List[web3.types.RPCResponse]:
+#         obj = []
+#         for method, params in requests:
+#             rpc_dict = {
+#                 "jsonrpc": "2.0",
+#                 "method": method,
+#                 "params": params or [],
+#                 "id": next(self.request_counter),
+#             }
+#             obj.append(rpc_dict)
+
+#         response = self._internal_provider.make_batch_request(obj)
+#         response = sorted(response, key=lambda x: x['id'])
+#         return response
+
+#     @backoff.on_exception(
+#         backoff.expo,
+#         (
+#             requests.exceptions.ConnectionError,
+#             requests.exceptions.Timeout,
+#         ),
+#         max_time=10 * 60,
+#         factor=4,
+#         on_backoff=lambda x: x['args'][0]._connect()
+#     )
+#     def make_request(self, method, params):
+#         return self._internal_provider.make_request(method, params)
 
 
 def connect_web3() -> web3.Web3:

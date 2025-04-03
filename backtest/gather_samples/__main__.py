@@ -61,7 +61,7 @@ def main():
             websocket_timeout=60 * 5,
             websocket_kwargs={
                 'max_size': 1024 * 1024 * 1024, # 1 Gb max payload
-            },
+            }
         ))
 
         w3 = web3.Web3(web3.WebsocketProvider(
