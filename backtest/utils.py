@@ -59,7 +59,7 @@ def connect_rabbit() -> pika.BlockingConnection:
     return cxn
 
 def connect_db() -> psycopg2.extensions.connection:
-    pg_host = os.getenv('PSQL_HOST', '')
+    pg_host = os.getenv('PSQL_HOST', 'ethereum-measurement-pg')
     pg_port = int(os.getenv('PSQL_PORT', '5432'))
     pg_user = os.getenv('PSQL_USER', 'measure')
     pg_pass = os.getenv('PSQL_PASS', 'password')
